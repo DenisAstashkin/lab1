@@ -1,6 +1,22 @@
 import numpy as np
 from PIL import Image
 
+def spin(coord, alpha, beta, gama, tx, ty, tz):
+    R = np.matmul(np.array([[1, 0, 0], 
+             [0, np.cos(alpha), np.sin(alpha)], 
+             [0, -np.sin(alpha), np.cos(alpha)]]),
+    np.array([[np.cos(beta), 0, np.sin(beta)], 
+             [0, 1, 0], 
+             [-np.sin(beta), 0, np.cos(beta)]]),
+    np.array([[np.cos(gama), np.sin(gama), 0], 
+             [-np.sin(gama), np.cos(gama), 0], 
+             [0, 0, 1]]))
+    ress = []
+    for i in coord:
+        c = np.matmul(np.array([i[0] - tx, i[1] - ty, i[2]]), R) + np.array([0, 0, tz])
+        ress.append([float(c[0]), float(c[1]), float(c[2])])
+    return ress
+
 def normal(c0: tuple, c1: tuple, c2: tuple):
     x_n = (c1[1] - c2[1]) * (c1[2] - c0[2]) - (c1[1] - c0[1]) * (c1[2] - c2[2])
     y_n = (c1[2] - c2[2]) * (c1[0] - c0[0]) - (c1[0] - c2[0]) * (c1[2] - c0[2])
@@ -58,15 +74,17 @@ def draw_picture(vertices, faces, output_path, image_size=1000):
     model_width = max_x - min_x
     model_height = max_y - min_y
     
-    scale_x = (W * 0.9) / max(model_width, 0.001)
-    scale_y = (H * 0.9) / max(model_height, 0.001)
-    scale = min(scale_x, scale_y)
+    scale_x = (W * 0.5) / max(model_width, 0.001)
+    scale_y = (H * 0.5) / max(model_height, 0.001)
     
+    scale = min(scale_x, scale_y) * 0.1
     center_x = (min_x + max_x) / 2
     center_y = (min_y + max_y) / 2
-    offset_x = W // 2 - center_x * scale
-    offset_y = H // 2 - center_y * scale
+    offset_x = W // 2 
+    offset_y = H // 2 
     z_buf = np.full((H, W), 1000000, dtype=np.float32)
+    
+    vertices = spin(vertices, 0, 90, 0, center_x, center_y, 0.1)
     
     for face in faces:
         
@@ -83,12 +101,12 @@ def draw_picture(vertices, faces, output_path, image_size=1000):
         
         if(c >= 0): continue
         
-        img_x1 = x1 * scale + offset_x
-        img_y1 = y1 * scale + offset_y
-        img_x2 = x2 * scale + offset_x
-        img_y2 = y2 * scale + offset_y
-        img_x3 = x3 * scale + offset_x
-        img_y3 = y3 * scale + offset_y
+        img_x1 = x1 * scale / z1 + offset_x
+        img_y1 = y1 * scale / z1 + offset_y
+        img_x2 = x2 * scale / z2 + offset_x
+        img_y2 = y2 * scale / z2 + offset_y
+        img_x3 = x3 * scale / z3 + offset_x
+        img_y3 = y3 * scale / z3 + offset_y
         
         x_min = min(img_x1, img_x2, img_x3)
         y_min = min(img_y1, img_y2, img_y3)
@@ -102,9 +120,12 @@ def draw_picture(vertices, faces, output_path, image_size=1000):
                 cord = bar(x, y, (img_x1, img_y1), (img_x2, img_y2), (img_x3, img_y3))
                 if(cord[0] >= 0 and cord[1] >= 0 and cord[2] >= 0): 
                     z = cord[0] * z1 + cord[1] * z2 + cord[2] * z3
-                    if (z < z_buf[H - y, x]):
-                        image_array[H - y, x] = color
-                        z_buf[H - y, x] = z
+                    try:
+                        if (z < z_buf[H - y, x]):
+                            image_array[H - y, x] = color
+                            z_buf[H - y, x] = z
+                    except:
+                        continue
         
       
     
